@@ -1,0 +1,17 @@
+{
+  "name": "student-planner-firebase-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:auth": "node --test auth.emulator.test.js",
+    "test:rules": "node --test firestore.rules.test.js",
+    "test:storage": "node --test storage.rules.test.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.5.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.0"
+  }
+}

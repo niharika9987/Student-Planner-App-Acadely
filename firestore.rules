@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owns(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validProfile(uid) {
+      let profile = request.resource.data;
+      return profile.keys().hasAll([
+            'displayName',
+            'email',
+            'university',
+            'universityId',
+            'degree',
+            'department',
+            'currentSemester',
+            'academicYear',
+            'timezone',
+            'preferredWeekStart',
+            'theme',
+            'notificationsEnabled',
+            'studyGoals',
+            'onboardingComplete',
+            'schemaVersion',
+            'createdAt',
+            'updatedAt'
+          ])
+          && profile.keys().hasOnly([
+            'displayName',
+            'email',
+            'university',
+            'universityId',
+            'degree',
+            'department',
+            'currentSemester',
+            'academicYear',
+            'timezone',
+            'preferredWeekStart',
+            'theme',
+            'notificationsEnabled',
+            'studyGoals',
+            'onboardingComplete',
+            'schemaVersion',
+            'createdAt',
+            'updatedAt'
+          ])
+          && profile.displayName is string
+          && profile.displayName.size() > 0
+          && profile.displayName.size() <= 100
+          && profile.email == request.auth.token.email
+          && (profile.university == null || (
+            profile.university is string && profile.university.size() <= 160
+          ))
+          && (profile.universityId == null || (
+            profile.universityId is string && profile.universityId.size() <= 128
+          ))
+          && (profile.degree == null || (
+            profile.degree is string && profile.degree.size() <= 120
+          ))
+          && (profile.department == null || (
+            profile.department is string && profile.department.size() <= 120
+          ))
+          && (profile.currentSemester == null || (
+            profile.currentSemester is string && profile.currentSemester.size() <= 120
+          ))
+          && (profile.academicYear == null || (
+            profile.academicYear is string && profile.academicYear.size() <= 40
+          ))
+          && profile.timezone is string
+          && profile.timezone.size() <= 100
+          && profile.preferredWeekStart is int
+          && profile.preferredWeekStart >= 1
+          && profile.preferredWeekStart <= 7
+          && profile.theme in ['light', 'dark', 'system']
+          && profile.notificationsEnabled is bool
+          && profile.studyGoals is list
+          && profile.studyGoals.size() <= 20
+          && profile.onboardingComplete is bool
+          && profile.schemaVersion == 1
+          && profile.createdAt is timestamp
+          && profile.updatedAt is timestamp
+          && (resource == null || profile.createdAt == resource.data.createdAt);
+    }
+
+    function validTask(data) {
+      return data.keys().hasAll([
+            'title',
+            'category',
+            'dueLabel',
+            'priority',
+            'isCompleted',
+            'isAssignment'
+          ])
+          && data.keys().hasOnly([
+            'title',
+            'category',
+            'dueLabel',
+            'priority',
+            'isCompleted',
+            'isAssignment'
+          ])
+          && data.title is string
+          && data.title.size() > 0
+          && data.title.size() <= 240
+          && data.category in ['academic', 'personal']
+          && data.dueLabel is string
+          && data.dueLabel.size() <= 160
+          && data.priority in ['low', 'normal', 'high']
+          && data.isCompleted is bool
+          && data.isAssignment is bool;
+    }
+
+    function validRecord(uid, collection) {
+      let record = request.resource.data;
+      return record.keys().hasAll([
+            'ownerUid',
+            'type',
+            'data',
+            'createdAt',
+            'updatedAt'
+          ])
+          && record.keys().hasOnly([
+            'ownerUid',
+            'type',
+            'data',
+            'createdAt',
+            'updatedAt'
+          ])
+          && record.ownerUid == uid
+          && record.type == collection
+          && collection in [
+            'academicTerms',
+            'subjects',
+            'subjectEnrollments',
+            'classSessions',
+            'timetableEntries',
+            'attendanceRecords',
+            'assignments',
+            'assignmentMilestones',
+            'exams',
+            'assessmentComponents',
+            'grades',
+            'tasks',
+            'subtasks',
+            'personalEvents',
+            'habits',
+            'habitCompletions',
+            'goals',
+            'goalMilestones',
+            'studySessions',
+            'notes',
+            'attachments',
+            'flashcards',
+            'quizzes',
+            'notifications',
+            'userPreferences',
+            'aiPlanningSuggestions'
+          ]
+          && record.data is map
+          && record.data.size() > 0
+          && record.data.size() <= 32
+          && (collection != 'tasks' || validTask(record.data))
+          && record.createdAt is timestamp
+          && record.updatedAt is timestamp
+          && (resource == null || (
+            record.createdAt == resource.data.createdAt
+            && record.ownerUid == resource.data.ownerUid
+            && record.type == resource.data.type
+          ));
+    }
+
+    match /users/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid) && validProfile(uid);
+      allow delete: if owns(uid);
+
+      match /auditRecords/{recordId} {
+        allow read: if owns(uid);
+        allow delete: if owns(uid);
+        allow create, update: if false;
+      }
+
+      match /{collection}/{recordId} {
+        allow read, delete: if owns(uid)
+            && collection != 'auditRecords';
+        allow create, update: if owns(uid)
+            && collection == 'tasks'
+            && validRecord(uid, collection);
+      }
+    }
+
+    match /universities/{universityId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
